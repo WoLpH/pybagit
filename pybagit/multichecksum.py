@@ -61,7 +61,7 @@ def write_manifest(datadir, encoding, update=False):
 
     for file_, checksum in sorted(checksums.iteritems()):
         rp = os.path.relpath(file_, bag_root)
-        fl = ensure_unix_pathname(rp)
+        fl = ensure_unix_pathname(rp).decode(ENCODING, 'replace')
         mfile.write(u"{0} {1}\n".format(checksum, fl))
 
     mfile.close()
@@ -70,7 +70,7 @@ def write_manifest(datadir, encoding, update=False):
 def dirwalk(datadir):
     datafiles = []
 
-    for dirpath, dirnames, filenames in os.walk(u"{0}".format(datadir)):
+    for dirpath, dirnames, filenames in os.walk(datadir):
         for fn in filenames:
             datafiles.append(os.path.join(dirpath, fn))
     return datafiles
