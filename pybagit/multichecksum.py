@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# !/usr/bin/env python
 
 __author__ = "Andrew Hankinson (andrew.hankinson@mail.mcgill.ca)"
 __version__ = "1.5"
@@ -32,10 +32,12 @@ import hashlib
 import codecs
 import re
 from pybagit.exceptions import *
+from functools import reduce
 
 # declare a default hashalgorithm
 HASHALG = 'sha1'
 ENCODING = "utf-8"
+
 
 def write_manifest(datadir, encoding, update=False):
     bag_root = os.path.split(os.path.abspath(datadir))[0]
@@ -110,14 +112,27 @@ def ensure_unix_pathname(pathname):
 if __name__ == "__main__":
     parser = OptionParser()
     usage = "%prog [options] arg1 arg2"
-    parser.add_option("-a", "--algorithm", action="store", help="checksum algorithm to use (sha1|md5)")
-    parser.add_option("-c", "--encoding", action="store", help="File encoding to write manifest")
-    parser.add_option("-u", "--update", action="store_true", help="Only update new/removed files")
+    parser.add_option(
+        "-a",
+        "--algorithm",
+        action="store",
+        help="checksum algorithm to use (sha1|md5)")
+    parser.add_option(
+        "-c",
+        "--encoding",
+        action="store",
+        help="File encoding to write manifest")
+    parser.add_option(
+        "-u",
+        "--update",
+        action="store_true",
+        help="Only update new/removed files")
     (options, args) = parser.parse_args()
 
     if options.algorithm:
         if not options.algorithm in ('md5', 'sha1'):
-            raise BagCheckSumNotValid('You must specify either "md5" or "sha1" as the checksum algorithm')
+            raise BagCheckSumNotValid(
+                'You must specify either "md5" or "sha1" as the checksum algorithm')
         HASHALG = options.algorithm
 
     if options.encoding:

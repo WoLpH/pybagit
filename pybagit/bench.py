@@ -1,4 +1,3 @@
-import os
 import timeit
 
 pyb_statement = """

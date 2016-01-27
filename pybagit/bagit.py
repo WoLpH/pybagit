@@ -42,9 +42,11 @@ import time
 
 # import bagit-specific exceptions.
 from pybagit.exceptions import *
+from functools import reduce
 
 
 class BagIt:
+
     def __init__(self, bag, validate=False, extended=True, fetch=False):
         """ Creates a Bag object. If file doesn't exist, it initializes an
             empty directory with empty files; if it does, it reads in the
@@ -57,39 +59,50 @@ class BagIt:
             them in the appropriate directory.
         """
 
-        self._bag              = bag  # bag as passed in. Could be either directory or file name, and may not exist.
-        self.extended          = extended  # True if it is an 'extended' bag; False if it is not.
-        self.hash_encoding     = u'sha1'  # default hash encoding. Could also be md5. Should always be lowercase.
+        # bag as passed in. Could be either directory or file name, and may not
+        # exist.
+        self._bag = bag
+        # True if it is an 'extended' bag; False if it is not.
+        self.extended = extended
+        # default hash encoding. Could also be md5. Should always be lowercase.
+        self.hash_encoding = u'sha1'
         self.bag_major_version = 0
-        self.bag_minor_version = 96   # default bagit version. Set to the latest approved version.
-        self.tag_file_encoding = u'utf-8'  # default text encoding. always lower case.
-        self.data_directory    = None  # path to the bag data directory
-        self.bag_directory     = None  # path to the bag directory
-        self.bagit_file        = None  # path to the bagit.txt file
-        self.manifest_file     = None  # path to the manifest.*.txt file
+        # default bagit version. Set to the latest approved version.
+        self.bag_minor_version = 96
+        # default text encoding. always lower case.
+        self.tag_file_encoding = u'utf-8'
+        self.data_directory = None  # path to the bag data directory
+        self.bag_directory = None  # path to the bag directory
+        self.bagit_file = None  # path to the bagit.txt file
+        self.manifest_file = None  # path to the manifest.*.txt file
         self.tag_manifest_file = None  # path to the tagmanifest.*.txt file
-        self.fetch_file        = None
-        self.baginfo_file      = None
-        self.manifest_contents = None  # dictionary containing the current manifest contents.
+        self.fetch_file = None
+        self.baginfo_file = None
+        # dictionary containing the current manifest contents.
+        self.manifest_contents = None
         self.tag_manifest_contents = None
-        self.fetch_contents    = None
-        self.baginfo_contents  = None
-        self.bag_compression   = None  # compression type (if any)
-        self.bag_errors        = []  # list of bag validation errors
-        self.platform          = sys.platform  # set the platform value.
-        self.new_files         = set()  # Files added discovered in the last update()
-        self.existing_files    = set()  # Files known before the last update()
-        self.deleted_files     = set()  # Files deleted before the last update()
+        self.fetch_contents = None
+        self.baginfo_contents = None
+        self.bag_compression = None  # compression type (if any)
+        self.bag_errors = []  # list of bag validation errors
+        self.platform = sys.platform  # set the platform value.
+        self.new_files = set()  # Files added discovered in the last update()
+        self.existing_files = set()  # Files known before the last update()
+        self.deleted_files = set()  # Files deleted before the last update()
 
         module_path = os.path.dirname(os.path.abspath(__file__))
-        self._path_to_multichecksum = os.path.join(module_path, "multichecksum.py")
+        self._path_to_multichecksum = os.path.join(
+            module_path,
+            "multichecksum.py")
 
         try:
             if os.path.exists(self._bag):
                 self._open_bag()
                 return
             else:
-                raise BagDoesNotExistError("Bag does not exist at {0}".format(self._bag))
+                raise BagDoesNotExistError(
+                    "Bag does not exist at {0}".format(
+                        self._bag))
         except BagDoesNotExistError:
             self._create_bag()
         finally:
@@ -114,7 +127,9 @@ class BagIt:
             hash encoding.
         """
         info = {}
-        info['version'] = "{0}.{1}".format(self.bag_major_version, self.bag_minor_version)
+        info['version'] = "{0}.{1}".format(
+            self.bag_major_version,
+            self.bag_minor_version)
         info['encoding'] = self.tag_file_encoding
         info['hash'] = self.hash_encoding
         return info
@@ -134,16 +149,21 @@ class BagIt:
     def set_hash_encoding(self, algorithm):
         """ Sets the bag checksum algorithm. """
         if algorithm.lower() not in ('md5', 'sha1'):
-            raise BagCheckSumNotValid('You must specify either "md5" or "sha1".')
+            raise BagCheckSumNotValid(
+                'You must specify either "md5" or "sha1".')
         self.hash_encoding = unicode(algorithm)
-        self.manifest_file = os.path.join(self.bag_directory, "manifest-{0}.txt".format(self.hash_encoding))
+        self.manifest_file = os.path.join(
+            self.bag_directory, "manifest-{0}.txt".format(self.hash_encoding))
 
     def show_bag_info(self):
         """ Shows some information on the bag, it's contents and metadta.
 
             !!! TODO: Make this look prettier.
         """
-        print("Bag Version: {0}.{1}".format(self.bag_major_version, self.bag_minor_version))
+        print(
+            "Bag Version: {0}.{1}".format(
+                self.bag_major_version,
+                self.bag_minor_version))
         print("Tag File Encoding: {0}".format(self.tag_file_encoding))
         bagtype = "Base" if not self.extended else "Extended"
         print("Bag Type: {0}".format(bagtype))
@@ -201,21 +221,25 @@ class BagIt:
         # verify the presence of the bagit.txt file
         try:
             codecs.open(self.bagit_file, 'r', self.tag_file_encoding)
-        except Exception, e:
-            errors.append(('bagit.txt', 'bagit.txt file does not exist: {0}'.format(e)))
+        except Exception as e:
+            errors.append(
+                ('bagit.txt', 'bagit.txt file does not exist: {0}'.format(e)))
 
         # verify the presence of the data directory
         try:
             if not os.path.exists(self.data_directory):
                 raise BagIsNotValidError('Not Found')
-        except (BagIsNotValidError, Exception), e:
-            errors.append(('data', 'data directory could not be found: e'.format(e)))
+        except (BagIsNotValidError, Exception) as e:
+            errors.append(
+                ('data', 'data directory could not be found: e'.format(e)))
 
         # verify the presence of the manifest-(sha1|md5).txt file
         try:
             codecs.open(self.manifest_file, 'r', self.tag_file_encoding)
-        except Exception, e:
-            errors.append(('manifest-{0}.txt'.format(self.hash_encoding), 'manifest-{0}.txt file does not exist: {1}'.format(self.hash_encoding, e)))
+        except Exception as e:
+            errors.append(('manifest-{0}.txt'.format(self.hash_encoding),
+                           'manifest-{0}.txt file does not exist: {1}'.format(self.hash_encoding,
+                                                                              e)))
 
         try:
             # verify the contents of the manifest-(sha1|md5).txt file.
@@ -226,15 +250,26 @@ class BagIt:
             else:
                 for dir in os.walk(self.data_directory):
                     for file in dir[2]:
-                        csum = self._calculate_checksum(os.path.join(dir[0], file))
-                        relpath = os.path.relpath(os.path.join(dir[0], file), self.bag_directory)
+                        csum = self._calculate_checksum(
+                            os.path.join(
+                                dir[0],
+                                file))
+                        relpath = os.path.relpath(
+                            os.path.join(
+                                dir[0],
+                                file),
+                            self.bag_directory)
                         if relpath in self.manifest_contents:
                             if cmp(self.manifest_contents[relpath], csum) != 0:
-                                errors.append((relpath, 'Incorrect filename or checksum in manifest'))
+                                errors.append(
+                                    (relpath, 'Incorrect filename or checksum in manifest'))
                         else:
-                            errors.append((relpath, 'File is not correct in manifest'))
-        except (BagIsNotValidError, Exception), e:
-            errors.append(('checksum verification', 'Problems verifying the manifest: {0}'.format(e)))
+                            errors.append(
+                                (relpath, 'File is not correct in manifest'))
+        except (BagIsNotValidError, Exception) as e:
+            errors.append(
+                ('checksum verification',
+                 'Problems verifying the manifest: {0}'.format(e)))
 
         self.bag_errors = errors
         return self.bag_errors
@@ -288,6 +323,8 @@ class BagIt:
 
             for name in files:
                 self.new_filesfile = self._sanitize_filename(name)
+                print 'FILENAME', name, self.new_filesfile
+                raise IOError()
                 full_file = os.path.join(path, self.new_filesfile)
                 if self.new_filesfile != name:
                     os.rename(os.path.join(path, name), full_file)
@@ -326,9 +363,17 @@ class BagIt:
 
         # clean out any previous tag manifest contents.
         self.tag_manifest_contents = {}
-        for f in ['bagit.txt', 'bag-info.txt', 'fetch.txt', self.manifest_file]:
-            csum = self._calculate_checksum(os.path.join(self.bag_directory, f))
-            relp = os.path.relpath(os.path.join(self.bag_directory, f), self.bag_directory)
+        for f in ['bagit.txt', 'bag-info.txt', 'fetch.txt',
+                  self.manifest_file]:
+            csum = self._calculate_checksum(
+                os.path.join(
+                    self.bag_directory,
+                    f))
+            relp = os.path.relpath(
+                os.path.join(
+                    self.bag_directory,
+                    f),
+                self.bag_directory)
             self.tag_manifest_contents[relp] = csum
 
         # write out the tag manifest
@@ -344,17 +389,29 @@ class BagIt:
 
         for entry in self.fetch_contents:
             try:
-                if not os.path.exists(os.path.join(self.bag_directory, entry['filename'])):
-                    dwnlddir = os.path.join(self.bag_directory, os.path.dirname(entry['filename']))
+                if not os.path.exists(
+                        os.path.join(self.bag_directory, entry['filename'])):
+                    dwnlddir = os.path.join(
+                        self.bag_directory,
+                        os.path.dirname(
+                            entry['filename']))
                     filename = os.path.basename(entry['filename'])
                     if not os.path.exists(dwnlddir):
                         os.makedirs(dwnlddir)
-                    urllib.urlretrieve(entry['url'], os.path.join(dwnlddir, filename))
+                    urllib.urlretrieve(
+                        entry['url'],
+                        os.path.join(
+                            dwnlddir,
+                            filename))
                 else:
                     # file already downloaded to bag. Continue.
                     continue
-            except Exception, e:
-                self.bag_errors.append(('fetch', 'URL {0} could not be downloaded {1}'.format(entry['url'], e)))
+            except Exception as e:
+                self.bag_errors.append(
+                    ('fetch',
+                     'URL {0} could not be downloaded {1}'.format(
+                         entry['url'],
+                         e)))
                 continue
 
         if validate_downloads:
@@ -394,7 +451,8 @@ class BagIt:
 
         package = self._compress_bag(method)
         shutil.move(package, destination)
-        if os.path.exists(os.path.join(destination, os.path.basename(package))):
+        if os.path.exists(
+                os.path.join(destination, os.path.basename(package))):
             return os.path.join(destination, os.path.basename(package))
         else:
             raise BagError("Uh oh! We've lost track of a file...")
@@ -409,11 +467,15 @@ class BagIt:
                 os.mkdir(self._bag)
             else:
                 os.mkdir(os.path.join(current_path, self._bag))
-        except OSError, e:
-            raise BagCouldNotBeCreatedError("Bag Could Not Be Created: {0}".format(e))
+        except OSError as e:
+            raise BagCouldNotBeCreatedError(
+                "Bag Could Not Be Created: {0}".format(e))
             return
-        except Exception, e:
-            raise BagError('Could not create directory {0}').format(os.path.join(current_path, self._bag))
+        except Exception as e:
+            raise BagError('Could not create directory {0}').format(
+                os.path.join(
+                    current_path,
+                    self._bag))
             return
 
         self.bag_directory = os.path.join(current_path, self._bag)
@@ -421,11 +483,13 @@ class BagIt:
         os.mkdir(self.data_directory)
 
         version_id = u"BagIt-Version: {0}.{1}\n".format(self.bag_major_version,
-                                                     self.bag_minor_version)
-        encoding = u"Tag-File-Character-Encoding: {0}\n".format(self.tag_file_encoding.upper())
+                                                        self.bag_minor_version)
+        encoding = u"Tag-File-Character-Encoding: {0}\n".format(
+            self.tag_file_encoding.upper())
 
         self.bagit_file = os.path.join(self.bag_directory, 'bagit.txt')
-        self.manifest_file = os.path.join(self.bag_directory, 'manifest-{0}.txt'.format(self.hash_encoding))
+        self.manifest_file = os.path.join(
+            self.bag_directory, 'manifest-{0}.txt'.format(self.hash_encoding))
 
         bfile_contents = (version_id, encoding)
         bfile = codecs.open(self.bagit_file, 'w', self.tag_file_encoding)
@@ -436,21 +500,34 @@ class BagIt:
         tfile = codecs.open(self.manifest_file, 'w', self.tag_file_encoding)
         tfile.close()
 
-        self._read_manifest_to_dict()  # this should be empty, but we'll do it to ensure consistency.
+        # this should be empty, but we'll do it to ensure consistency.
+        self._read_manifest_to_dict()
 
         if self.extended:
-            self.tag_manifest_file = os.path.join(self.bag_directory, 'tagmanifest-{0}.txt'.format(self.hash_encoding))
-            tmfile = codecs.open(self.tag_manifest_file, 'w', self.tag_file_encoding)
+            self.tag_manifest_file = os.path.join(
+                self.bag_directory, 'tagmanifest-{0}.txt'.format(self.hash_encoding))
+            tmfile = codecs.open(
+                self.tag_manifest_file,
+                'w',
+                self.tag_file_encoding)
             tmfile.close()
             self._read_manifest_to_dict(mode="t")
 
             self.fetch_file = os.path.join(self.bag_directory, 'fetch.txt')
-            fetchfile = codecs.open(self.fetch_file, 'w', self.tag_file_encoding)
+            fetchfile = codecs.open(
+                self.fetch_file,
+                'w',
+                self.tag_file_encoding)
             fetchfile.close()
             self._read_fetch_to_list()
 
-            self.baginfo_file = os.path.join(self.bag_directory, 'bag-info.txt')
-            binfofile = codecs.open(self.baginfo_file, 'w', self.tag_file_encoding)
+            self.baginfo_file = os.path.join(
+                self.bag_directory,
+                'bag-info.txt')
+            binfofile = codecs.open(
+                self.baginfo_file,
+                'w',
+                self.tag_file_encoding)
             binfofile.close()
             self._read_baginfo_to_dict()
 
@@ -461,7 +538,8 @@ class BagIt:
 
         # getattr converts the hash_encoding to a method argument for hashlib.
         block_size = 0x10000
-        hashalg = getattr(hashlib, self.hash_encoding)()  # == 'hashlib.md5' or 'hashlib.sha1'
+        # == 'hashlib.md5' or 'hashlib.sha1'
+        hashalg = getattr(hashlib, self.hash_encoding)()
 
         def upd(m, data):
             m.update(data)
@@ -483,8 +561,11 @@ class BagIt:
         """
 
         if self._is_compressed() is True:
-            # TODO: combine this with the more robust regex from the sanitize filenames method...
-            names = re.match(r"^(?P<basename>.*)\.(?P<ext>(zip|tar\.gz|tgz))", self._bag)
+            # TODO: combine this with the more robust regex from the sanitize
+            # filenames method...
+            names = re.match(
+                r"^(?P<basename>.*)\.(?P<ext>(zip|tar\.gz|tgz))",
+                self._bag)
             base = names.group('basename')
             bdir = self._uncompress_bag(base)
             self.bag_directory = bdir
@@ -497,46 +578,76 @@ class BagIt:
             bfile_contents = bfile.read()
             bfile.close()
 
-            self.bag_major_version, self.bag_minor_version = self._parse_version_string(bfile_contents)
-            self.tag_file_encoding = self._parse_encoding_string(bfile_contents).lower()  # tag file encoding is always lower case.
+            self.bag_major_version, self.bag_minor_version = self._parse_version_string(
+                bfile_contents)
+            # tag file encoding is always lower case.
+            self.tag_file_encoding = self._parse_encoding_string(
+                bfile_contents).lower()
         except:
-            self.bag_errors.append(('bagit', 'Had problems reading the Bagit.txt file.'))
+            self.bag_errors.append(
+                ('bagit', 'Had problems reading the Bagit.txt file.'))
 
         filelist = os.listdir(self.bag_directory)
 
         if len(filelist) > 0:
-            manifest = filter(lambda f: re.match(r"^manifest-(sha1|md5)\.txt", f), filelist)  # search for the right manifest file.
+            # search for the right manifest file.
+            manifest = filter(
+                lambda f: re.match(
+                    r"^manifest-(sha1|md5)\.txt",
+                    f),
+                filelist)
             if manifest:
                 try:
-                    self.hash_encoding = unicode(re.search(r"(?P<encoding>(sha1|md5))", manifest[0]).group('encoding'))
-                    self.manifest_file = os.path.join(self.bag_directory, manifest[0])
+                    self.hash_encoding = unicode(
+                        re.search(
+                            r"(?P<encoding>(sha1|md5))",
+                            manifest[0]).group('encoding'))
+                    self.manifest_file = os.path.join(
+                        self.bag_directory,
+                        manifest[0])
                     self._read_manifest_to_dict()
                 except:
-                    self.bag_errors.append(('manifest', 'Had problems reading the manifest file.'))
+                    self.bag_errors.append(
+                        ('manifest', 'Had problems reading the manifest file.'))
 
             self.data_directory = os.path.join(self.bag_directory, 'data')
 
-            tmanifest = filter(lambda f: re.match(r"^tagmanifest-(sha1|md5)\.txt", f), filelist)  # search for the right manifest file.
+            # search for the right manifest file.
+            tmanifest = filter(
+                lambda f: re.match(
+                    r"^tagmanifest-(sha1|md5)\.txt",
+                    f),
+                filelist)
             if tmanifest:
                 try:
-                    self.tag_manifest_file = os.path.join(self.bag_directory, tmanifest[0])
+                    self.tag_manifest_file = os.path.join(
+                        self.bag_directory,
+                        tmanifest[0])
                     self._read_manifest_to_dict(mode='t')
                 except:
-                    self.bag_errors.append(('tagmanifest', 'Had problems reading the tagmanifest file.'))
+                    self.bag_errors.append(
+                        ('tagmanifest', 'Had problems reading the tagmanifest file.'))
 
             if os.path.exists(os.path.join(self.bag_directory, 'fetch.txt')):
                 try:
-                    self.fetch_file = os.path.join(self.bag_directory, 'fetch.txt')
+                    self.fetch_file = os.path.join(
+                        self.bag_directory,
+                        'fetch.txt')
                     self._read_fetch_to_list()
                 except:
-                    self.bag_errors.append(('fetch', 'Had problems reading fetching the files.'))
+                    self.bag_errors.append(
+                        ('fetch', 'Had problems reading fetching the files.'))
 
-            if os.path.exists(os.path.join(self.bag_directory, 'bag-info.txt')):
+            if os.path.exists(
+                    os.path.join(self.bag_directory, 'bag-info.txt')):
                 try:
-                    self.baginfo_file = os.path.join(self.bag_directory, 'bag-info.txt')
+                    self.baginfo_file = os.path.join(
+                        self.bag_directory,
+                        'bag-info.txt')
                     self._read_baginfo_to_dict()
                 except:
-                    self.bag_errors.append(('baginfo', 'Had problems reading the bag info file.'))
+                    self.bag_errors.append(
+                        ('baginfo', 'Had problems reading the bag info file.'))
 
     def _is_compressed(self):
         """ returns true if the bag is compressed; false if not."""
@@ -642,7 +753,8 @@ class BagIt:
             !!! TODO: Calculate actual file length
         """
         ffile = codecs.open(self.fetch_file, 'w', self.tag_file_encoding)
-        for item in self.fetch_contents:  # fetch_contents is a list, not a dictionary!
+        # fetch_contents is a list, not a dictionary!
+        for item in self.fetch_contents:
             line = "{url} {length} {filename}\n".format(url=item['url'],
                                                         length='-',
                                                         filename=self._ensure_unix_pathname(item['filename']))
@@ -666,21 +778,27 @@ class BagIt:
             for line in bicontents:
                 if line[0] == ' ' or line[0] == "\t":
                     # we've got a continued line, signified by an indent.
-                    bag_info[prev_key] = " ".join((bag_info[prev_key], line.lstrip().rstrip()))
+                    bag_info[prev_key] = " ".join(
+                        (bag_info[prev_key], line.lstrip().rstrip()))
                 else:
                     # we've got a new entry
                     key, val = line.split(':', 1)
                     bag_info[key] = val.lstrip().rstrip()
                     prev_key = key
-        except Exception, e:
-            raise BagError('The bag-info.txt file may be malformed. Please re-check it.')
-            self.bag_errors('bag-info', 'The bag-info.txt file may be malformed.')
+        except Exception as e:
+            raise BagError(
+                'The bag-info.txt file may be malformed. Please re-check it.')
+            self.bag_errors(
+                'bag-info',
+                'The bag-info.txt file may be malformed.')
 
         self.baginfo_contents = bag_info
 
     def _update_manifest_filenames(self):
-        self.manifest_file = os.path.join(self.bag_directory, "manifest-{0}.txt".format(self.hash_encoding))
-        self.tag_manifest_file = os.path.join(self.bag_directory, "tagmanifest-{0}.txt".format(self.hash_encoding))
+        self.manifest_file = os.path.join(
+            self.bag_directory, "manifest-{0}.txt".format(self.hash_encoding))
+        self.tag_manifest_file = os.path.join(
+            self.bag_directory, "tagmanifest-{0}.txt".format(self.hash_encoding))
 
     def _write_dict_to_manifest(self, mode="d"):
         # ensure we're working with the latest files.
@@ -697,7 +815,8 @@ class BagIt:
         for k, v in contents.iteritems():
             # unix pathnames are the only ones acceptable in a manifest file.
             # this will ensure that if we're on Windows, we're still writing
-            # unix/style/pathnames, even though the manifest contains windows\style\pathnames.
+            # unix/style/pathnames, even though the manifest contains
+            # windows\style\pathnames.
             if self.platform == "win32":
                 k = self._ensure_unix_pathname(k)
 
@@ -762,19 +881,22 @@ class BagIt:
         """ Replaces or removes characters from filenames to make them
             not evil.
         """
-        # update the file_extensions regex if you encounter any special compound file extensions.
-        # We'll preserve entries in this as the extension, instead of just splitting
-        # at the last dot. Remember to keep the first dot intact!
-        # it will match extension up to 5 characters long.
-        file_extensions = re.compile(r"(\.tar\.gz$|\.tar\.bz2$|\.tar\.gzip$|\.tar\.bzip2$|\.[\w+]{5}$)")
+        # update the file_extensions regex if you encounter any special
+        # compound file extensions.  We'll preserve entries in this as the
+        # extension, instead of just splitting at the last dot. Remember to
+        # keep the first dot intact!  it will match extension up to 5
+        # characters long.
+        file_extensions = re.compile(
+            r"(\.tar\.gz$|\.tar\.bz2$|\.tar\.gzip$|\.tar\.bzip2$|\.[\w+]{5}$)")
 
-        underscore = re.compile(r"([ ])")
-        replace = re.compile(r"(CON|PRN|AUX|NUL|COM1|COM2|COM3|COM4|COM5|COM6|COM7|COM8|\
-                                COM9|LPT1|LPT2|LPT3|LPT4|LPT5|LPT6|LPT7|LPT8|LPT9)")
+        replace = re.compile(r"(CON|PRN|AUX|NUL|COM1|COM2|COM3|COM4|COM5|COM6|\
+                                COM7|COM8|COM9|LPT1|LPT2|LPT3|LPT4|LPT5|LPT6|\
+                                LPT7|LPT8|LPT9)")
         remove = re.compile(r"(\.{2}|[~\^@!#%&\*\/:'?\"<>\|])")
 
         split_fname = re.split(file_extensions, filename)
-        split_fname = [x for x in split_fname if len(x) != 0]  # get rid of any empty entries.
+        # get rid of any empty entries.
+        split_fname = [x for x in split_fname if len(x) != 0]
 
         base_fname = split_fname[0]
         # deal with leading-dot hidden files.
@@ -783,11 +905,14 @@ class BagIt:
         else:
             ext_fname = ''
 
-        # if we're replacing characters because of an invalid name, we'll lowercase
-        # the name and add 4 random characters. We do this because simply stripping
-        # them may cause filename collisions.
-        und_filename = re.sub(underscore, "_", base_fname)
-        rep_filename = re.sub(replace, "_".join((base_fname.lower(), "".join((random.sample(string.ascii_lowercase, 4))))), und_filename)
+        # if we're replacing characters because of an invalid name, we'll
+        # lowercase the name and add 4 random characters. We do this because
+        # simply stripping them may cause filename collisions.
+        random_letters = ''.join(random.sample(string.ascii_lowercase, 4))
+        rep_filename = re.sub(
+            replace,
+            '_'.join((base_fname.lower(), random_letters)),
+            base_fname)
         rem_filename = re.sub(remove, "", rep_filename)
         clean_filename = "".join((rem_filename, ext_fname))
         return clean_filename
