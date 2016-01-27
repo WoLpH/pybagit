@@ -323,8 +323,6 @@ class BagIt:
 
             for name in files:
                 self.new_filesfile = self._sanitize_filename(name)
-                print 'FILENAME', name, self.new_filesfile
-                raise IOError()
                 full_file = os.path.join(path, self.new_filesfile)
                 if self.new_filesfile != name:
                     os.rename(os.path.join(path, name), full_file)
