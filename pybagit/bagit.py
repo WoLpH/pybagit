@@ -317,10 +317,6 @@ class BagIt:
         self.removed_files = set()
 
         for path, dirs, files in os.walk(self.data_directory):
-            # add an empty .keep file in empty directories.
-            if not dirs and not files:
-                open(os.path.join(path, '.keep'), 'w').close()
-
             for name in files:
                 self.new_filesfile = self._sanitize_filename(name)
                 full_file = os.path.join(path, self.new_filesfile)
